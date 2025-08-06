@@ -3,6 +3,10 @@ import schedule
 import time
 import logging
 from datetime import datetime
+from colorama import init, Fore, Style
+
+# Initialize colorama for Windows support
+init()
 
 # Configure logging
 logging.basicConfig(
@@ -30,36 +34,36 @@ def check_api(api, max_retries=2):
     """Check the status of a single API endpoint with retries for DNS issues."""
     for attempt in range(max_retries + 1):
         try:
-            response = requests.get(api["url"], timeout=10)  # Increased timeout to 10 seconds
+            response = requests.get(api["url"], timeout=10)
             status_code = response.status_code
             is_up = status_code == api["expected_status"]
             
             if is_up:
                 logging.info(f"API {api['url']} is UP - Status Code: {status_code}")
-                print(f"API {api['url']} is UP - Status Code: {status_code}")
+                print(f"{Fore.GREEN}API {api['url']} is UP - Status Code: {status_code}{Style.RESET_ALL}")
             else:
                 logging.warning(f"API {api['url']} is DOWN - Status Code: {status_code}, Expected: {api['expected_status']}")
-                print(f"API {api['url']} is DOWN - Status Code: {status_code}, Expected: {api['expected_status']}")
+                print(f"{Fore.RED}API {api['url']} is DOWN - Status Code: {status_code}, Expected: {api['expected_status']}{Style.RESET_ALL}")
             return is_up, status_code
         
         except requests.exceptions.RequestException as e:
             if attempt < max_retries:
                 logging.warning(f"API {api['url']} attempt {attempt + 1} failed - Error: {str(e)}. Retrying in 5 seconds...")
-                print(f"API {api['url']} attempt {attempt + 1} failed - Error: {str(e)}. Retrying in 5 seconds...")
-                time.sleep(5)  # Wait 5 seconds before retrying
+                print(f"{Fore.YELLOW}API {api['url']} attempt {attempt + 1} failed - Error: {str(e)}. Retrying in 5 seconds...{Style.RESET_ALL}")
+                time.sleep(5)
             else:
                 logging.error(f"API {api['url']} failed after {max_retries + 1} attempts - Error: {str(e)}")
-                print(f"API {api['url']} failed after {max_retries + 1} attempts - Error: {str(e)}")
+                print(f"{Fore.RED}API {api['url']} failed after {max_retries + 1} attempts - Error: {str(e)}{Style.RESET_ALL}")
                 return False, None
 
 def monitor_apis():
     """Check all APIs and log their status."""
     logging.info("Starting API monitoring cycle")
-    print("Starting API monitoring cycle")
+    print(f"{Fore.WHITE}Starting API monitoring cycle{Style.RESET_ALL}")
     for api in API_LIST:
         check_api(api)
     logging.info("Completed API monitoring cycle")
-    print("Completed API monitoring cycle")
+    print(f"{Fore.WHITE}Completed API monitoring cycle{Style.RESET_ALL}")
 
 def main():
     # Schedule the monitor to run every 10 minutes
