@@ -1,5 +1,4 @@
 import requests
-import schedule
 import time
 import logging
 from datetime import datetime
@@ -110,16 +109,8 @@ def generate_chart_and_screenshot():
     print(f"{Fore.WHITE}Chart and screenshot saved as {screenshot_path}{Style.RESET_ALL}")
 
 def main():
-    # Schedule the monitor to run every 10 minutes
-    schedule.every(10).minutes.do(monitor_apis)
-    
     # Run the first check immediately
     monitor_apis()
-    
-    # Keep the script running
-    while True:
-        schedule.run_pending()
-        time.sleep(60)  # Check every minute for scheduled tasks
 
 if __name__ == "__main__":
     main()
