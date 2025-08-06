@@ -4,6 +4,9 @@ import time
 import logging
 from datetime import datetime
 from colorama import init, Fore, Style
+import matplotlib.pyplot as plt
+from PIL import Image
+import os
 
 # Initialize colorama for Windows support
 init()
@@ -64,6 +67,47 @@ def monitor_apis():
         check_api(api)
     logging.info("Completed API monitoring cycle")
     print(f"{Fore.WHITE}Completed API monitoring cycle{Style.RESET_ALL}")
+    generate_chart_and_screenshot()
+
+def generate_chart_and_screenshot():
+    """Generate a chart and screenshot based on the log file for the current session."""
+    # Parse log file
+    api_status = {api["url"]: [] for api in API_LIST}
+    timestamps = []
+    with open('api_uptime.log', 'r') as f:
+        for line in f:
+            if "API" in line and ("UP" in line or "DOWN" in line or "failed" in line):
+                timestamp = datetime.strptime(line[:19], '%Y-%m-%d %H:%M:%S')
+                url = line.split("API ")[1].split(" is")[0]
+                status = "UP" if "UP" in line else "DOWN" if "DOWN" in line else "FAILED"
+                api_status[url].append(status)
+                timestamps.append(timestamp)
+
+    # Create chart
+    plt.figure(figsize=(12, 6))
+    for url, statuses in api_status.items():
+        if statuses:  # Only plot if there are statuses
+            x = range(len(statuses))
+            y = [1 if s == "UP" else 0 if s == "DOWN" else -1 for s in statuses]
+            plt.plot(x, y, label=url, marker='o')
+
+    plt.title("API Uptime Status Over Time")
+    plt.xlabel("Check Number")
+    plt.ylabel("Status (1=UP, 0=DOWN, -1=FAILED)")
+    plt.yticks([-1, 0, 1], ["FAILED", "DOWN", "UP"])
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.grid(True)
+
+    # Save chart and capture screenshot
+    chart_path = 'api_uptime_chart.png'
+    plt.savefig(chart_path, bbox_inches='tight')
+    plt.close()
+
+    # Capture screenshot of the chart (using PIL)
+    chart_image = Image.open(chart_path)
+    screenshot_path = f'api_uptime_screenshot_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png'
+    chart_image.save(screenshot_path)
+    print(f"{Fore.WHITE}Chart and screenshot saved as {screenshot_path}{Style.RESET_ALL}")
 
 def main():
     # Schedule the monitor to run every 10 minutes
