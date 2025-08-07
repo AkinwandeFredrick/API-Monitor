@@ -3,9 +3,10 @@ import time
 import logging
 from datetime import datetime
 from colorama import init, Fore, Style
-import matplotlib.pyplot as plt
-from PIL import Image
+import pyautogui
 import os
+import matplotlib.pyplot as plt
+import numpy as np
 
 # Initialize colorama for Windows support
 init()
@@ -18,8 +19,6 @@ logging.basicConfig(
 )
 
 # List of APIs to monitor (URL and expected status code)
-# Note: https://restcountries.com/v3.1/all returns 400; investigate endpoint.
-# Note: https://api.coindesk.com/v1/bpi/currentprice.json and https://api.publicapis.org/entries have had DNS issues; retries added.
 API_LIST = [
     {"url": "https://jsonplaceholder.typicode.com/posts", "expected_status": 200},
     {"url": "https://restcountries.com/v3.1/all", "expected_status": 200},
@@ -69,44 +68,71 @@ def monitor_apis():
     generate_chart_and_screenshot()
 
 def generate_chart_and_screenshot():
-    """Generate a chart and screenshot based on the log file for the current session."""
+    """Generate a stacked bar chart and screenshot of the console display."""
     # Parse log file
-    api_status = {api["url"]: [] for api in API_LIST}
-    timestamps = []
+    api_status = {api["url"]: {"UP": 0, "DOWN": 0, "FAILED": 0} for api in API_LIST}
     with open('api_uptime.log', 'r') as f:
         for line in f:
-            if "API" in line and ("UP" in line or "DOWN" in line or "failed" in line):
-                timestamp = datetime.strptime(line[:19], '%Y-%m-%d %H:%M:%S')
-                url = line.split("API ")[1].split(" is")[0]
-                status = "UP" if "UP" in line else "DOWN" if "DOWN" in line else "FAILED"
-                api_status[url].append(status)
-                timestamps.append(timestamp)
+            if "API" in line:
+                # Extract the base URL by matching against API_LIST
+                url_start = line.find("API ") + 4
+                potential_url = line[url_start:].split()[0]
+                matched_url = next((url for url in API_LIST if url["url"].startswith(potential_url)), None)
+                if matched_url:
+                    url = matched_url["url"]
+                    # Count statuses
+                    if " is UP" in line:
+                        api_status[url]["UP"] += 1
+                    elif " is DOWN" in line:
+                        api_status[url]["DOWN"] += 1
+                    elif " failed after" in line:
+                        api_status[url]["FAILED"] += 1
 
-    # Create chart
-    plt.figure(figsize=(12, 6))
-    for url, statuses in api_status.items():
-        if statuses:  # Only plot if there are statuses
-            x = range(len(statuses))
-            y = [1 if s == "UP" else 0 if s == "DOWN" else -1 for s in statuses]
-            plt.plot(x, y, label=url, marker='o')
+    # Prepare data for stacked bar chart
+    labels = [
+        "jsonplaceholder.typicode.com",
+        "restcountries.com",
+        "dog.ceo",
+        "api.coindesk.com",
+        "pokeapi.co",
+        "api.publicapis.org",
+        "randomuser.me",
+        "gamerpower.com",
+        "api.openverse.engineering"
+    ]
+    up_counts = [api_status[api["url"]]["UP"] for api in API_LIST]
+    down_counts = [api_status[api["url"]]["DOWN"] for api in API_LIST]
+    failed_counts = [api_status[api["url"]]["FAILED"] for api in API_LIST]
 
-    plt.title("API Uptime Status Over Time")
-    plt.xlabel("Check Number")
-    plt.ylabel("Status (1=UP, 0=DOWN, -1=FAILED)")
-    plt.yticks([-1, 0, 1], ["FAILED", "DOWN", "UP"])
-    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.grid(True)
+    # Create stacked bar chart
+    fig, ax = plt.subplots(figsize=(12, 6))
+    x = np.arange(len(labels))
+    ax.bar(x, up_counts, label="UP", color="#2ecc71")
+    ax.bar(x, down_counts, bottom=up_counts, label="DOWN", color="#e74c3c")
+    ax.bar(x, failed_counts, bottom=np.array(up_counts) + np.array(down_counts), label="FAILED", color="#7f8c8d")
 
-    # Save chart and capture screenshot
+    # Customize chart
+    ax.set_xlabel("APIs")
+    ax.set_ylabel("Status Count")
+    ax.set_title("API Uptime Status Counts")
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, rotation=45, ha="right")
+    ax.legend()
+    ax.grid(True, axis="y", linestyle="--", alpha=0.7)
+    ax.set_ylim(bottom=0)
+
+    # Save chart as PNG
     chart_path = 'api_uptime_chart.png'
     plt.savefig(chart_path, bbox_inches='tight')
-    plt.close()
+    plt.close(fig)
+    print(f"{Fore.WHITE}Bar chart saved as {chart_path}{Style.RESET_ALL}")
 
-    # Capture screenshot of the chart (using PIL)
-    chart_image = Image.open(chart_path)
-    screenshot_path = f'api_uptime_screenshot_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png'
-    chart_image.save(screenshot_path)
-    print(f"{Fore.WHITE}Chart and screenshot saved as {screenshot_path}{Style.RESET_ALL}")
+    # Capture screenshot of the console display
+    time.sleep(1)  # Wait for console output to stabilize
+    screenshot_path = f'console_screenshot_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png'
+    screenshot = pyautogui.screenshot()
+    screenshot.save(screenshot_path)
+    print(f"{Fore.WHITE}Console screenshot saved as {screenshot_path}{Style.RESET_ALL}")
 
 def main():
     # Run the first check immediately
